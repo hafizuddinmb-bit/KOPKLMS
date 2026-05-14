@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistem Pengurusan Olahraga</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+
+*{
+  box-sizing:border-box;
+}
+
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  display:flex;
+  background:#f1f5f9;
+}
+
+.sidebar{
+  width:260px;
+  background:#0f172a;
+  color:white;
+  height:100vh;
+  overflow-y:auto;
+  position:fixed;
+}
+
+.sidebar h2{
+  text-align:center;
+  padding:20px 0;
+  margin:0;
+  border-bottom:1px solid rgba(255,255,255,0.1);
+}
+
+.menu-item{
+  padding:15px 20px;
+  cursor:pointer;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+
+.menu-item:hover{
+  background:#1e293b;
+}
+
+.submenu{
+  display:none;
+  background:#1e293b;
+}
+
+.submenu div{
+  padding:12px 35px;
+  cursor:pointer;
+}
+
+.submenu div:hover{
+  background:#334155;
+}
+
+.main{
+  margin-left:260px;
+  width:calc(100% - 260px);
+  padding:20px;
+}
+
+.card{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  margin-bottom:20px;
+  box-shadow:0 2px 5px rgba(0,0,0,0.1);
+}
+
+input, select, button{
+  width:100%;
+  padding:10px;
+  margin-top:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+}
+
+button{
+  background:#2563eb;
+  color:white;
+  border:none;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#1d4ed8;
+}
+
+.stats{
+  display:flex;
+  gap:15px;
+  flex-wrap:wrap;
+}
+
+.stat-box{
+  flex:1;
+  min-width:180px;
+  background:#2563eb;
+  color:white;
+  padding:20px;
+  border-radius:10px;
+  text-align:center;
+  font-size:18px;
+}
+
+.hidden{
+  display:none;
+}
+
+.list-item{
+  background:#e2e8f0;
+  padding:15px;
+  border-radius:10px;
+  margin-bottom:10px;
+}
+
+.list-item h3{
+  margin:0;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+}
+
+table th{
+  background:#0f172a;
+  color:white;
+  padding:12px;
+}
+
+table td{
+  padding:10px;
+  border-bottom:1px solid #ddd;
+}
+
+.action-btn{
+  width:auto;
+  padding:7px 12px;
+  margin:2px;
+}
+
+.red{
+  background:red;
+}
+
+.green{
+  background:green;
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  display:none;
+  justify-content:center;
+  align-items:center;
+}
+
+.modal-content{
+  width:400px;
+  background:white;
+  padding:20px;
+  border-radius:12px;
+}
+
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+
+  <h2>Olahraga</h2>
+
+  <div class="menu-item" onclick="showDashboard()">
+    Dashboard
+  </div>
+
+  <div class="menu-item" onclick="showRegister()">
+    Daftar Peserta
+  </div>
+
+  <div class="menu-item" onclick="showAddEvent()">
+    Tambah Acara
+  </div>
+
+  <div class="menu-item" onclick="toggleMenu('eventMenu')">
+    Acara ▼
+  </div>
+
+  <div id="eventMenu" class="submenu"></div>
+
+  <div class="menu-item" onclick="toggleMenu('schoolMenu')">
+    Sekolah ▼
+  </div>
+
+  <div id="schoolMenu" class="submenu"></div>
+
+</div>
+
+<div class="main">
+
+  <!-- DASHBOARD -->
+  <div id="dashboardSection">
+
+    <div class="card">
+
+      <h2>Statistik</h2>
+
+      <div class="stats">
+
+        <div class="stat-box">
+          Jumlah Peserta
+          <br><br>
+          <span id="totalPeserta">0</span>
+        </div>
+
+        <div class="stat-box">
+          Jumlah Sekolah
+          <br><br>
+          <span id="totalSekolah">0</span>
+        </div>
+
+        <div class="stat-box">
+          Jumlah Acara
+          <br><br>
+          <span id="totalAcara">0</span>
+        </div>
+
+      </div>
+
+    </div>
+
+    <div class="card">
+
+      <h2>Senarai Sekolah</h2>
+
+      <div id="dashboardSchools"></div>
+
+    </div>
+
+  </div>
+
+  <!-- REGISTER -->
+  <div id="registerSection" class="hidden card">
+
+    <h2>Pendaftaran Peserta</h2>
+
+    <input type="text" id="nama" placeholder="Nama Peserta">
+
+    <input type="text" id="kadoku" placeholder="No Kad OKU">
+
+    <input type="text" id="ic" placeholder="No IC">
+
+    <input type="text" id="nobadan" placeholder="No Badan">
+
+    <select id="sekolah">
+
+      <option value="">Pilih Sekolah</option>
+
+      <option value="SMK Toh Johan">SMK Toh Johan</option>
+      <option value="SMK Bukit Jana">SMK Bukit Jana</option>
+      <option value="SMK Kamunting">SMK Kamunting</option>
+      <option value="SMK Tat Beng">SMK Tat Beng</option>
+      <option value="SMK Simpang">SMK Simpang</option>
+      <option value="SMK Pengkalan Aur">SMK Pengkalan Aur</option>
+      <option value="SMK Doktor Burhanuddin">SMK Doktor Burhanuddin</option>
+      <option value="SMK Dato Kamaruddin">SMK Dato Kamaruddin</option>
+      <option value="SMK Jelai">SMK Jelai</option>
+      <option value="SMK Redang Panjang">SMK Redang Panjang</option>
+      <option value="SMK Dato Haji Hussin">SMK Dato Haji Hussin</option>
+      <option value="SMK Sg Bayor">SMK Sg Bayor</option>
+      <option value="SK Sg Tinggi">SK Sg Tinggi</option>
+      <option value="SK Toh Johan">SK Toh Johan</option>
+      <option value="SK Dato Panglima Bukit Gantang">SK Dato Panglima Bukit Gantang</option>
+      <option value="SK Changkat Larut">SK Changkat Larut</option>
+      <option value="SK Seri Aman">SK Seri Aman</option>
+      <option value="SK Kg Boyan">SK Kg Boyan</option>
+      <option value="SK Assam Kumbang">SK Assam Kumbang</option>
+      <option value="SK Matang">SK Matang</option>
+      <option value="SJKC Sin Min">SJKC Sin Min</option>
+      <option value="SJKT St Theresa">SJKT St Theresa</option>
+      <option value="SJKC Hua Lian 3">SJKC Hua Lian 3</option>
+      <option value="SJKC Aulong">SJKC Aulong</option>
+      <option value="SK Taman Palma">SK Taman Palma</option>
+      <option value="SK Long Jaafar">SK Long Jaafar</option>
+      <option value="SK Bukit Jana">SK Bukit Jana</option>
+      <option value="SK Batu Kurau">SK Batu Kurau</option>
+      <option value="SK Kampong Perak">SK Kampong Perak</option>
+      <option value="SK Kg Gudang">SK Kg Gudang</option>
+      <option value="SK Hj Wan Jaafar">SK Hj Wan Jaafar</option>
+      <option value="SK Rantau Panjang">SK Rantau Panjang</option>
+      <option value="SK Sri Selama">SK Sri Selama</option>
+      <option value="SK Bukit Bertam">SK Bukit Bertam</option>
+      <option value="SK Sultan Idris II">SK Sultan Idris II</option>
+      <option value="SK Sg Bayor">SK Sg Bayor</option>
+      <option value="SK Pendidikan Khas">SK Pendidikan Khas</option>
+      
+
+    </select>
+
+    <button onclick="registerParticipant()">
+      Daftar Peserta
+    </button>
+
+  </div>
+
+  <!-- ADD EVENT -->
+  <div id="addEventSection" class="hidden card">
+
+    <h2>Tambah Acara</h2>
+
+    <input type="text" id="eventName" placeholder="Nama Acara">
+
+    <select id="eventCategory">
+      <option value="B12">B12</option>
+      <option value="B15">B15</option>
+      <option value="B19">B19</option>
+    </select>
+
+    <select id="eventGender">
+      <option value="Lelaki">Lelaki</option>
+      <option value="Perempuan">Perempuan</option>
+    </select>
+
+    <button onclick="addEvent()">
+      Tambah Acara
+    </button>
+
+  </div>
+
+  <!-- CONTENT -->
+  <div id="contentSection" class="hidden card">
+
+    <h2 id="contentTitle"></h2>
+
+    <div id="contentBody"></div>
+
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div class="modal" id="assignModal">
+
+  <div class="modal-content">
+
+    <h3>Daftar Acara</h3>
+
+    <select id="assignEventSelect"></select>
+
+    <button onclick="confirmAssignEvent()">
+      Simpan
+    </button>
+
+    <button onclick="closeModal()" class="red">
+      Tutup
+    </button>
+
+  </div>
+
+</div>
+
+<script>
+
+const firebaseConfig = {
+
+  apiKey: "AIzaSyCaegle-pxirfzoxTMIdW444IHnKK-kGVc",
+  authDomain: "kopk-lms-872f8.firebaseapp.com",
+  projectId: "kopk-lms-872f8",
+  storageBucket: "kopk-lms-872f8.firebasestorage.app",
+  messagingSenderId: "644416357339",
+  appId: "1:644416357339:web:af6c526b38063f85395dfe"
+
+};
+
+firebase.initializeApp(firebaseConfig);
+
+const db = firebase.firestore();
+
+let selectedParticipant = null;
+let currentExportData = [];
+
+function toggleMenu(menuId){
+
+  const menu = document.getElementById(menuId);
+
+  menu.style.display =
+    menu.style.display === "block"
+    ? "none"
+    : "block";
+}
+
+function hideAll(){
+
+  document.querySelectorAll('.main > div')
+    .forEach(div => div.classList.add('hidden'));
+}
+
+function showDashboard(){
+
+  hideAll();
+
+  dashboardSection.classList.remove('hidden');
+
+  loadStats();
+
+  loadSchools();
+
+}
+
+function showRegister(){
+
+  hideAll();
+
+  registerSection.classList.remove('hidden');
+}
+
+function showAddEvent(){
+
+  hideAll();
+
+  addEventSection.classList.remove('hidden');
+}
+
+async function loadStats(){
+
+  const participants = await db.collection("participants").get();
+  const events = await db.collection("events").get();
+
+  const schools = new Set();
+
+  participants.forEach(doc => {
+    schools.add(doc.data().sekolah);
+  });
+
+  totalPeserta.innerText = participants.size;
+  totalSekolah.innerText = schools.size;
+  totalAcara.innerText = events.size;
+}
+
+async function registerParticipant(){
+
+  const participant = {
+
+    nama: nama.value,
+    kadoku: kadoku.value,
+    ic: ic.value,
+    nobadan: nobadan.value,
+    sekolah: sekolah.value
+
+  };
+
+  await db.collection("participants").add(participant);
+
+  alert("Peserta berjaya didaftarkan");
+
+  nama.value = "";
+  kadoku.value = "";
+  ic.value = "";
+  nobadan.value = "";
+  sekolah.selectedIndex = 0;
+
+  loadSchools();
+  loadStats();
+}
+
+async function addEvent(){
+
+  const data = {
+
+    name: eventName.value,
+    category: eventCategory.value,
+    gender: eventGender.value
+
+  };
+
+  await db.collection("events").add(data);
+
+  alert("Acara berjaya ditambah");
+
+  eventName.value = "";
+
+  loadEventMenu();
+}
+
+async function loadSchools(){
+
+  const menu = document.getElementById("schoolMenu");
+  const dashboard = document.getElementById("dashboardSchools");
+
+  menu.innerHTML = "";
+  dashboard.innerHTML = "";
+
+  const snapshot = await db.collection("participants").get();
+
+  const schools = new Set();
+
+  snapshot.forEach(doc => {
+    schools.add(doc.data().sekolah);
+  });
+
+  schools.forEach(sekolah => {
+
+    menu.innerHTML += `
+      <div onclick="loadSchoolParticipants('${sekolah}')">
+        ${sekolah}
+      </div>
+    `;
+
+    dashboard.innerHTML += `
+      <div class="list-item">
+        <h3>${sekolah}</h3>
+        <button onclick="loadSchoolParticipants('${sekolah}')">
+          Lihat Peserta
+        </button>
+      </div>
+    `;
+  });
+}
+
+async function loadSchoolParticipants(sekolah){
+
+  hideAll();
+
+  contentSection.classList.remove('hidden');
+
+  contentTitle.innerText = sekolah;
+
+  const body = document.getElementById("contentBody");
+
+  body.innerHTML = "";
+
+  const snapshot = await db.collection("participants")
+    .where("sekolah","==",sekolah)
+    .get();
+
+  currentExportData = [];
+
+  body.innerHTML = `
+    <button onclick="exportExcel()">
+      Export Excel
+    </button>
+
+    <table>
+
+      <thead>
+
+        <tr>
+
+          <th>No Badan</th>
+          <th>Nama</th>
+          <th>IC</th>
+          <th>Tindakan</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody id="tableBody"></tbody>
+
+    </table>
+  `;
+
+  const tbody = document.getElementById("tableBody");
+
+  snapshot.forEach(doc => {
+
+    const p = doc.data();
+
+    currentExportData.push(p);
+
+    tbody.innerHTML += `
+
+      <tr>
+
+        <td>${p.nobadan || '-'}</td>
+
+        <td>${p.nama}</td>
+
+        <td>${p.ic || '-'}</td>
+
+        <td>
+
+          <button
+            class="action-btn green"
+            onclick="openAssignModal('${doc.id}')">
+
+            Daftar Acara
+
+          </button>
+
+          <button
+            class="action-btn red"
+            onclick="deleteParticipant('${doc.id}')">
+
+            Padam
+
+          </button>
+
+        </td>
+
+      </tr>
+    `;
+  });
+}
+
+async function deleteParticipant(id){
+
+  const confirmDelete =
+    confirm("Padam peserta ini?");
+
+  if(!confirmDelete) return;
+
+  await db.collection("participants")
+    .doc(id)
+    .delete();
+
+  alert("Peserta dipadam");
+
+  loadSchools();
+  loadStats();
+}
+
+async function loadEventMenu(){
+
+  const menu = document.getElementById("eventMenu");
+
+  menu.innerHTML = "";
+
+  const snapshot = await db.collection("events").get();
+
+  snapshot.forEach(doc => {
+
+    const e = doc.data();
+
+    menu.innerHTML += `
+      <div onclick="loadEventParticipants('${doc.id}','${e.name}')">
+
+        ${e.name}
+        (${e.category} - ${e.gender})
+
+      </div>
+    `;
+  });
+}
+
+async function loadEventParticipants(eventId, eventName){
+
+  hideAll();
+
+  contentSection.classList.remove('hidden');
+
+  contentTitle.innerText = eventName;
+
+  const body = document.getElementById("contentBody");
+
+  body.innerHTML = `
+
+    <button onclick="exportEventExcel()">
+      Export Excel
+    </button>
+
+    <table>
+
+      <thead>
+
+        <tr>
+
+          <th>No Badan</th>
+          <th>Nama</th>
+          <th>Sekolah</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody id="eventTable"></tbody>
+
+    </table>
+  `;
+
+  const tbody = document.getElementById("eventTable");
+
+  currentExportData = [];
+
+  const joins = await db.collection("eventParticipants")
+    .where("eventId","==",eventId)
+    .get();
+
+  for(const join of joins.docs){
+
+    const data = join.data();
+
+    const participant =
+      await db.collection("participants")
+      .doc(data.participantId)
+      .get();
+
+    if(participant.exists){
+
+      const p = participant.data();
+
+      tbody.innerHTML += `
+
+        <tr>
+
+          <td>${p.nobadan || '-'}</td>
+          <td>${p.nama}</td>
+          <td>${p.sekolah}</td>
+
+        </tr>
+      `;
+
+      // simpan untuk export excel
+      currentExportData.push({
+
+        "Nama Acara": eventName,
+        "Nama Peserta": p.nama,
+        "No Badan": p.nobadan || '-',
+        "Nama Sekolah": p.sekolah
+
+      });
+    }
+  }
+}
+
+function exportEventExcel(){
+
+  if(currentExportData.length === 0){
+
+    alert("Tiada data untuk export");
+    return;
+  }
+
+  const worksheet =
+    XLSX.utils.json_to_sheet(currentExportData);
+
+  const workbook =
+    XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    "Acara"
+  );
+
+  // ambil nama acara
+  const fileName =
+    contentTitle.innerText
+      .replace(/\s+/g, "_");
+
+  XLSX.writeFile(
+    workbook,
+    fileName + ".xlsx"
+  );
+}
+
+async function openAssignModal(participantId){
+
+  selectedParticipant = participantId;
+
+  const select =
+    document.getElementById("assignEventSelect");
+
+  select.innerHTML = "";
+
+  const snapshot =
+    await db.collection("events").get();
+
+  snapshot.forEach(doc => {
+
+    const e = doc.data();
+
+    select.innerHTML += `
+      <option value="${doc.id}">
+
+        ${e.name}
+        (${e.category} - ${e.gender})
+
+      </option>
+    `;
+  });
+
+  assignModal.style.display = "flex";
+}
+
+function closeModal(){
+
+  assignModal.style.display = "none";
+}
+
+async function confirmAssignEvent(){
+
+  const eventId =
+    assignEventSelect.value;
+
+  const check =
+    await db.collection("eventParticipants")
+    .where("participantId","==",selectedParticipant)
+    .where("eventId","==",eventId)
+    .get();
+
+  if(!check.empty){
+
+    alert("Peserta sudah didaftarkan");
+
+    return;
+  }
+
+  await db.collection("eventParticipants").add({
+
+    participantId:selectedParticipant,
+    eventId:eventId
+
+  });
+
+  alert("Peserta berjaya dimasukkan");
+
+  closeModal();
+}
+
+function exportExcel(){
+
+  const worksheet =
+    XLSX.utils.json_to_sheet(currentExportData);
+
+  const workbook =
+    XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    worksheet,
+    "Peserta"
+  );
+
+  XLSX.writeFile(
+    workbook,
+    "peserta.xlsx"
+  );
+}
+
+loadStats();
+loadSchools();
+loadEventMenu();
+
+</script>
+
+</body>
+</html>
