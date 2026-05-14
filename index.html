@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sistem Pengurusan Olahraga</title>
+<title>Sistem Pendaftaran KOPK LMS</title>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -640,20 +640,54 @@ async function loadEventMenu(){
 
   const snapshot = await db.collection("events").get();
 
+  // GROUPING ikut nama acara utama
+  const grouped = {};
+
   snapshot.forEach(doc => {
 
     const e = doc.data();
 
-    menu.innerHTML += `
-      <div onclick="loadEventParticipants('${doc.id}','${e.name}')">
+    // contoh nama: "100 m B12 Lelaki"
+    // kita ambil KEY utama (first keyword)
 
-        ${e.name}
-        (${e.category} - ${e.gender})
+    let key = "Lain-lain";
 
-      </div>
-    `;
+    if(e.name.toLowerCase().includes("100")){
+      key = "100 m";
+    }
+    else if(e.name.toLowerCase().includes("200")){
+      key = "200 m";
+    }
+    else if(e.name.toLowerCase().includes("400")){
+      key = "400 m";
+    }
+    else if(e.name.toLowerCase().includes("lompat jauh")){
+      key = "Lompat Jauh";
+    }
+    else if(e.name.toLowerCase().includes("lontar peluru")){
+      key = "Lontar Peluru";
+    }
+    else if(e.name.toLowerCase().includes("lempar cakera")){
+      key = "Lempar Cakera";
+    }
+    else if(e.name.toLowerCase().includes("1500")){
+      key = "1500 m";
+    }
+    else if(e.name.toLowerCase().includes("rejam lembing")){
+      key = "Rejam Lembing";
+    }
+
+
+    if(!grouped[key]){
+      grouped[key] = [];
+    }
+
+    grouped[key].push({
+      id: doc.id,
+      ...e
+    });
   });
-}
+
 
 async function loadEventParticipants(eventId, eventName){
 
