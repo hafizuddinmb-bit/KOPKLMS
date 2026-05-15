@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="ms">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -660,6 +662,9 @@ async function loadSchoolParticipants(sekolah){
 
   body.innerHTML = `
     <button onclick="exportExcel()">Export Excel</button>
+    <button onclick="exportPDF()">
+  Export PDF
+</button>
     <table>
       <thead>
         <tr>
@@ -718,10 +723,80 @@ async function loadSchoolParticipants(sekolah){
       "No Badan": p.nobadan || '-',
       "Nama": p.nama,
       "IC": p.ic || '-',
+      "No Kad OKU": p.kadoku || '-',
       "Sekolah": p.sekolah,
       "Acara": acaraList.join(", ")
     });
   });
+}
+
+async function exportPDF(){
+
+  if(currentExportData.length === 0){
+    alert("Tiada data untuk export");
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF({
+    orientation: 'landscape'
+  });
+
+  // TITLE
+  doc.setFontSize(16);
+  doc.text(
+    `Senarai Peserta - ${contentTitle.innerText}`,
+    14,
+    15
+  );
+
+  // TABLE
+  doc.autoTable({
+
+    startY: 25,
+
+    head: [[
+      'No Badan',
+      'Nama',
+      'No IC',
+      'No Kad OKU',
+      'Acara Disertai'
+    ]],
+
+    body: currentExportData.map(p => [
+      p['No Badan'] || '-',
+      p['Nama'] || '-',
+      p['IC'] || '-',
+      p['No Kad OKU'] || '-',
+      p['Acara'] || '-'
+    ]),
+
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+      overflow: 'linebreak'
+    },
+
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: 255,
+      fontStyle: 'bold'
+    },
+
+    columnStyles: {
+      0: { cellWidth: 20 },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 35 },
+      3: { cellWidth: 35 },
+      4: { cellWidth: 100 }
+    }
+
+  });
+
+  doc.save(
+    `${contentTitle.innerText}.pdf`
+  );
 }
 
 async function deleteParticipant(id){
@@ -945,6 +1020,14 @@ function exportEventExcel(){
   const worksheet =
     XLSX.utils.json_to_sheet(currentExportData);
 
+// 🔥 COLUMN SIZE
+  worksheet['!cols'] = [
+    { wch: 35 }, // Nama Acara
+    { wch: 30 }, // Nama Peserta
+    { wch: 15 }, // No Badan
+    { wch: 30 }  // Sekolah
+  ];
+
   const workbook =
     XLSX.utils.book_new();
 
@@ -1049,8 +1132,21 @@ async function removeFromEvent(joinId, eventId, eventName){
 
 function exportExcel(){
 
+  if(currentExportData.length === 0){
+  alert("Tiada data untuk export");
+  return;
+}
+
   const worksheet =
     XLSX.utils.json_to_sheet(currentExportData);
+
+ worksheet['!cols'] = [
+ { wch: 12 }, // No Badan
+ { wch: 30 }, // Nama
+ { wch: 20 }, // IC
+ { wch: 25 }, // Sekolah
+ { wch: 50 }  // Acara
+];
 
   const workbook =
     XLSX.utils.book_new();
