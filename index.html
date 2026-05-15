@@ -394,6 +394,10 @@ firebase.initializeApp(firebaseConfig);
 
 const db = firebase.firestore();
 
+let EVENTS = {};
+let PARTICIPANTS = {};
+let EVENT_PARTICIPANTS = [];
+
 let selectedParticipant = null;
 let currentExportData = [];
 
@@ -439,6 +443,38 @@ function showAddEvent(){
   addEventSection.classList.remove('hidden');
 }
 
+async function initData(){
+
+  // load events
+  const eventsSnap = await db.collection("events").get();
+  EVENTS = {};
+
+  eventsSnap.forEach(doc => {
+    EVENTS[doc.id] = doc.data();
+  });
+
+  // load participants
+  const partSnap = await db.collection("participants").get();
+  PARTICIPANTS = {};
+
+  partSnap.forEach(doc => {
+    PARTICIPANTS[doc.id] = {
+      id: doc.id,
+      ...doc.data()
+    };
+  });
+
+  // load joins (eventParticipants)
+  const joinSnap = await db.collection("eventParticipants").get();
+  EVENT_PARTICIPANTS = [];
+
+  joinSnap.forEach(doc => {
+    EVENT_PARTICIPANTS.push(doc.data());
+  });
+
+  console.log("DATA LOADED (PRO MODE)");
+}
+
 async function loadStats(){
 
   const participants = await db.collection("participants").get();
@@ -468,6 +504,8 @@ async function registerParticipant(){
   };
 
   await db.collection("participants").add(participant);
+
+  await initData();
 
   alert("Peserta berjaya didaftarkan");
 
@@ -508,159 +546,119 @@ async function loadSchools(){
   menu.innerHTML = "";
   dashboard.innerHTML = "";
 
-  const snapshot = await db.collection("participants").get();
+  // 🔥 guna cache PARTICIPANTS
+  const participants = Object.values(PARTICIPANTS);
 
-  const schools = new Set();
+  const schools = [...new Set(
+    participants.map(p => p.sekolah).filter(Boolean)
+  )];
 
-  snapshot.forEach(doc => {
-    schools.add(doc.data().sekolah);
-  });
+  schools.sort();
 
   schools.forEach(sekolah => {
 
+    // kira jumlah peserta
+    const total = participants.filter(
+      p => p.sekolah === sekolah
+    ).length;
+
     menu.innerHTML += `
       <div onclick="loadSchoolParticipants('${sekolah}')">
-        ${sekolah}
+        ${sekolah} (${total})
       </div>
     `;
 
     dashboard.innerHTML += `
       <div class="list-item">
         <h3>${sekolah}</h3>
+
+        <p>Jumlah Peserta: ${total}</p>
+
         <button onclick="loadSchoolParticipants('${sekolah}')">
           Lihat Peserta
         </button>
       </div>
     `;
   });
+
+  console.log("SCHOOLS LOADED", schools.length);
 }
 
 async function loadSchoolParticipants(sekolah){
 
   hideAll();
-
   contentSection.classList.remove('hidden');
 
   contentTitle.innerText = sekolah;
 
   const body = document.getElementById("contentBody");
 
-  body.innerHTML = "";
-
-  const snapshot = await db.collection("participants")
-    .where("sekolah","==",sekolah)
-    .get();
-
-  currentExportData = [];
-
   body.innerHTML = `
-    <button onclick="exportExcel()">
-      Export Excel
-    </button>
-
+    <button onclick="exportExcel()">Export Excel</button>
     <table>
-
       <thead>
-
         <tr>
-
           <th>No Badan</th>
           <th>Nama</th>
           <th>IC</th>
-          <th>Acara Disertai</th>
+          <th>Acara</th>
           <th>Tindakan</th>
-
         </tr>
-
       </thead>
-
       <tbody id="tableBody"></tbody>
-
     </table>
   `;
 
   const tbody = document.getElementById("tableBody");
 
-  for (const doc of snapshot.docs) {
+  // filter participants by school (FAST - no DB call)
+  const filtered = Object.values(PARTICIPANTS)
+    .filter(p => p.sekolah === sekolah);
 
-    const p = doc.data();
+  currentExportData = [];
 
-    // ambil acara peserta
-    const joinSnapshot = await db.collection("eventParticipants")
-      .where("participantId","==",doc.id)
-      .get();
+  filtered.forEach(p => {
 
-    let acaraList = [];
+    // cari event join (FAST array filter)
+    const joins = EVENT_PARTICIPANTS
+      .filter(j => j.participantId === p.id);
 
-    for (const joinDoc of joinSnapshot.docs) {
+    const acaraList = joins.map(j => {
+      const e = EVENTS[j.eventId];
+      if(!e) return null;
+      return `${e.name} (${e.category} - ${e.gender})`;
+    }).filter(Boolean);
 
-      const joinData = joinDoc.data();
+    tbody.innerHTML += `
+      <tr>
+        <td>${p.nobadan || '-'}</td>
+        <td>${p.nama}</td>
+        <td>${p.ic || '-'}</td>
+        <td>${acaraList.join("<br>") || '-'}</td>
+        <td>
+          <button class="action-btn green"
+            onclick="openAssignModal('${p.id}')">
+            Daftar Acara
+          </button>
 
-      const eventDoc = await db.collection("events")
-        .doc(joinData.eventId)
-        .get();
-
-      if(eventDoc.exists){
-
-        const eventData = eventDoc.data();
-
-        acaraList.push(
-          `${eventData.name} (${eventData.category} - ${eventData.gender})`
-        );
-      }
-    }
-
-    const acaraText =
-      acaraList.length > 0
-      ? acaraList.join("<br>")
-      : "-";
+          <button class="action-btn red"
+            onclick="deleteParticipant('${p.id}')">
+            Padam
+          </button>
+        </td>
+      </tr>
+    `;
 
     currentExportData.push({
-
       "No Badan": p.nobadan || '-',
       "Nama": p.nama,
       "IC": p.ic || '-',
       "Sekolah": p.sekolah,
       "Acara": acaraList.join(", ")
-
     });
-
-    tbody.innerHTML += `
-
-      <tr>
-
-        <td>${p.nobadan || '-'}</td>
-
-        <td>${p.nama}</td>
-
-        <td>${p.ic || '-'}</td>
-
-        <td>${acaraText}</td>
-
-        <td>
-
-          <button
-            class="action-btn green"
-            onclick="openAssignModal('${doc.id}')">
-
-            Daftar Acara
-
-          </button>
-
-          <button
-            class="action-btn red"
-            onclick="deleteParticipant('${doc.id}')">
-
-            Padam
-
-          </button>
-
-        </td>
-
-      </tr>
-    `;
-  }
+  });
 }
+
 async function deleteParticipant(id){
 
   const confirmDelete =
@@ -672,6 +670,8 @@ async function deleteParticipant(id){
     .doc(id)
     .delete();
 
+  await initData();
+
   alert("Peserta dipadam");
 
   loadSchools();
@@ -681,20 +681,11 @@ async function deleteParticipant(id){
 async function loadEventMenu(){
 
   const menu = document.getElementById("eventMenu");
-
   menu.innerHTML = "";
 
-  const snapshot = await db.collection("events").get();
-
-  // GROUPING ikut nama acara utama
   const grouped = {};
 
-  snapshot.forEach(doc => {
-
-    const e = doc.data();
-
-    // contoh nama: "100 m B12 Lelaki"
-    // kita ambil KEY utama (first keyword)
+  Object.entries(EVENTS).forEach(([id, e]) => {
 
     let key = "Lain-lain";
 
@@ -726,33 +717,24 @@ async function loadEventMenu(){
       key = "80 m ";
     }
 
-    if(!grouped[key]){
-      grouped[key] = [];
-    }
-
-    grouped[key].push({
-      id: doc.id,
-      ...e
-    });
+    if(!grouped[key]) grouped[key] = [];
+    grouped[key].push({id, ...e});
   });
 
-  // bina UI sidebar
-  Object.keys(grouped).sort().forEach(category => {
+  Object.keys(grouped).sort().forEach(cat => {
 
-    const submenuId = category.replace(/\s/g,'') + "Menu";
+    const submenuId = cat.replace(/\s/g,'') + "Menu";
 
     menu.innerHTML += `
       <div onclick="toggleMenu('${submenuId}')">
-        ${category} ▼
+        ${cat} ▼
       </div>
-
       <div id="${submenuId}" class="submenu"></div>
     `;
 
     const sub = document.getElementById(submenuId);
 
-    grouped[category].forEach(e => {
-
+    grouped[cat].forEach(e => {
       sub.innerHTML += `
         <div onclick="loadEventParticipants('${e.id}','${e.name}')">
           ${e.name} (${e.category} - ${e.gender})
@@ -873,28 +855,18 @@ function exportEventExcel(){
   );
 }
 
-async function openAssignModal(participantId){
+function openAssignModal(participantId){
 
   selectedParticipant = participantId;
 
-  const select =
-    document.getElementById("assignEventSelect");
-
+  const select = document.getElementById("assignEventSelect");
   select.innerHTML = "";
 
-  const snapshot =
-    await db.collection("events").get();
-
-  snapshot.forEach(doc => {
-
-    const e = doc.data();
+  Object.entries(EVENTS).forEach(([id, e]) => {
 
     select.innerHTML += `
-      <option value="${doc.id}">
-
-        ${e.name}
-        (${e.category} - ${e.gender})
-
+      <option value="${id}">
+        ${e.name} (${e.category} - ${e.gender})
       </option>
     `;
   });
@@ -957,9 +929,16 @@ function exportExcel(){
   );
 }
 
-loadStats();
-loadSchools();
-loadEventMenu();
+window.onload = async function(){
+
+  await initData();
+
+  loadStats();
+  loadSchools();
+  loadEventMenu();
+
+};
+
 
 </script>
 
