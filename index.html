@@ -326,6 +326,12 @@ table td{
       <option value="B12">B12</option>
       <option value="B15">B15</option>
       <option value="B19">B19</option>
+      <option value="Terbuka">Terbuka</option>
+    </select>
+
+    <select id="eventSchool">
+      <option value="Sekolah Rendah">Sekolah Rendah</option>
+      <option value="Sekolah Menengah">Perempuan</option>
     </select>
 
     <select id="eventGender">
@@ -561,6 +567,7 @@ async function loadSchoolParticipants(sekolah){
           <th>No Badan</th>
           <th>Nama</th>
           <th>IC</th>
+          <th>Acara Disertai</th>
           <th>Tindakan</th>
 
         </tr>
@@ -574,11 +581,49 @@ async function loadSchoolParticipants(sekolah){
 
   const tbody = document.getElementById("tableBody");
 
-  snapshot.forEach(doc => {
+  for (const doc of snapshot.docs) {
 
     const p = doc.data();
 
-    currentExportData.push(p);
+    // ambil acara peserta
+    const joinSnapshot = await db.collection("eventParticipants")
+      .where("participantId","==",doc.id)
+      .get();
+
+    let acaraList = [];
+
+    for (const joinDoc of joinSnapshot.docs) {
+
+      const joinData = joinDoc.data();
+
+      const eventDoc = await db.collection("events")
+        .doc(joinData.eventId)
+        .get();
+
+      if(eventDoc.exists){
+
+        const eventData = eventDoc.data();
+
+        acaraList.push(
+          `${eventData.name} (${eventData.category} - ${eventData.gender})`
+        );
+      }
+    }
+
+    const acaraText =
+      acaraList.length > 0
+      ? acaraList.join("<br>")
+      : "-";
+
+    currentExportData.push({
+
+      "No Badan": p.nobadan || '-',
+      "Nama": p.nama,
+      "IC": p.ic || '-',
+      "Sekolah": p.sekolah,
+      "Acara": acaraList.join(", ")
+
+    });
 
     tbody.innerHTML += `
 
@@ -589,6 +634,8 @@ async function loadSchoolParticipants(sekolah){
         <td>${p.nama}</td>
 
         <td>${p.ic || '-'}</td>
+
+        <td>${acaraText}</td>
 
         <td>
 
@@ -612,9 +659,8 @@ async function loadSchoolParticipants(sekolah){
 
       </tr>
     `;
-  });
+  }
 }
-
 async function deleteParticipant(id){
 
   const confirmDelete =
@@ -676,7 +722,9 @@ async function loadEventMenu(){
     else if(e.name.toLowerCase().includes("rejam lembing")){
       key = "Rejam Lembing";
     }
-
+    else if(e.name.toLowerCase().includes("80")){
+      key = "80 m ";
+    }
 
     if(!grouped[key]){
       grouped[key] = [];
