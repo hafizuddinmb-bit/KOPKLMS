@@ -394,9 +394,43 @@ firebase.initializeApp(firebaseConfig);
 
 const db = firebase.firestore();
 
+let currentSchool = null;
 let EVENTS = {};
 let PARTICIPANTS = {};
 let EVENT_PARTICIPANTS = [];
+
+const EVENT_ORDER = [
+  "100 m",
+  "200 m",
+  "400 m",
+  "800 m",
+  "1500 m",
+  "80 m",
+  "Lompat Jauh",
+  "Lompat Tinggi",
+  "Lontar Peluru",
+  "Rejam Lembing",
+  "Lempar Cakera"
+];
+
+function sortEvents(events){
+
+  return events.sort((a, b) => {
+
+    const getOrder = (name) => {
+
+      const found = EVENT_ORDER.find(event =>
+        name.toLowerCase().includes(event.toLowerCase())
+      );
+
+      return found
+        ? EVENT_ORDER.indexOf(found)
+        : 999;
+    };
+
+    return getOrder(a.name) - getOrder(b.name);
+  });
+}
 
 let selectedParticipant = null;
 let currentExportData = [];
@@ -445,34 +479,29 @@ function showAddEvent(){
 
 async function initData(){
 
-  // load events
-  const eventsSnap = await db.collection("events").get();
+  const [eventsSnap, partSnap, joinSnap] = await Promise.all([
+    db.collection("events").get(),
+    db.collection("participants").get(),
+    db.collection("eventParticipants").get()
+  ]);
+
   EVENTS = {};
+  PARTICIPANTS = {};
+  EVENT_PARTICIPANTS = [];
 
   eventsSnap.forEach(doc => {
     EVENTS[doc.id] = doc.data();
   });
 
-  // load participants
-  const partSnap = await db.collection("participants").get();
-  PARTICIPANTS = {};
-
   partSnap.forEach(doc => {
-    PARTICIPANTS[doc.id] = {
-      id: doc.id,
-      ...doc.data()
-    };
+    PARTICIPANTS[doc.id] = { id: doc.id, ...doc.data() };
   });
-
-  // load joins (eventParticipants)
-  const joinSnap = await db.collection("eventParticipants").get();
-  EVENT_PARTICIPANTS = [];
 
   joinSnap.forEach(doc => {
     EVENT_PARTICIPANTS.push(doc.data());
   });
 
-  console.log("DATA LOADED (PRO MODE)");
+  console.log("CACHE READY");
 }
 
 async function loadStats(){
@@ -620,6 +649,8 @@ async function loadSchools(){
 
 async function loadSchoolParticipants(sekolah){
 
+  currentSchool = sekolah;
+
   hideAll();
   contentSection.classList.remove('hidden');
 
@@ -712,14 +743,25 @@ async function deleteParticipant(id){
   loadStats();
 }
 
-async function loadEventMenu(){
+function loadEventMenu(){
 
   const menu = document.getElementById("eventMenu");
+
   menu.innerHTML = "";
 
   const grouped = {};
 
-  Object.entries(EVENTS).forEach(([id, e]) => {
+  // ambil semua event
+  const allEvents = Object.entries(EVENTS).map(([id, e]) => ({
+    id,
+    ...e
+  }));
+
+  // sort event dulu
+  const sortedEvents = sortEvents(allEvents);
+
+  // grouping
+  sortedEvents.forEach(e => {
 
     let key = "Lain-lain";
 
@@ -732,8 +774,20 @@ async function loadEventMenu(){
     else if(e.name.toLowerCase().includes("400")){
       key = "400 m";
     }
+    else if(e.name.toLowerCase().includes("800")){
+      key = "800 m";
+    }
+    else if(e.name.toLowerCase().includes("1500")){
+      key = "1500 m";
+    }
+    else if(e.name.toLowerCase().includes("80")){
+      key = "80 m";
+    }
     else if(e.name.toLowerCase().includes("lompat jauh")){
       key = "Lompat Jauh";
+    }
+    else if(e.name.toLowerCase().includes("lompat tinggi")){
+      key = "Lompat Tinggi";
     }
     else if(e.name.toLowerCase().includes("lontar peluru")){
       key = "Lontar Peluru";
@@ -741,41 +795,57 @@ async function loadEventMenu(){
     else if(e.name.toLowerCase().includes("lempar cakera")){
       key = "Lempar Cakera";
     }
-    else if(e.name.toLowerCase().includes("1500")){
-      key = "1500 m";
-    }
     else if(e.name.toLowerCase().includes("rejam lembing")){
       key = "Rejam Lembing";
     }
-    else if(e.name.toLowerCase().includes("80")){
-      key = "80 m ";
+
+    if(!grouped[key]){
+      grouped[key] = [];
     }
 
-    if(!grouped[key]) grouped[key] = [];
-    grouped[key].push({id, ...e});
+    grouped[key].push(e);
   });
 
-  Object.keys(grouped).sort().forEach(cat => {
+  // ikut urutan EVENT_ORDER
+  EVENT_ORDER.forEach(category => {
 
-    const submenuId = cat.replace(/\s/g,'') + "Menu";
+    if(!grouped[category]) return;
+
+    const submenuId =
+      category.replace(/\s/g,'') + "Menu";
 
     menu.innerHTML += `
-      <div onclick="toggleMenu('${submenuId}')">
-        ${cat} ▼
+
+      <div onclick="toggleMenu('${submenuId}')"
+           class="menu-item">
+
+        ${category} ▼
+
       </div>
+
       <div id="${submenuId}" class="submenu"></div>
+
     `;
 
     const sub = document.getElementById(submenuId);
 
-    grouped[cat].forEach(e => {
+    grouped[category].forEach(e => {
+
       sub.innerHTML += `
+
         <div onclick="loadEventParticipants('${e.id}','${e.name}')">
-          ${e.name} (${e.category} - ${e.gender})
+
+          ${e.name}
+          (${e.category} - ${e.gender})
+
         </div>
+
       `;
     });
+
   });
+
+  console.log("EVENT MENU READY");
 }
 
 async function loadEventParticipants(eventId, eventName){
@@ -835,15 +905,21 @@ async function loadEventParticipants(eventId, eventName){
       const p = participant.data();
 
       tbody.innerHTML += `
+  <tr>
 
-        <tr>
+    <td>${p.nobadan || '-'}</td>
+    <td>${p.nama}</td>
+    <td>${p.sekolah}</td>
 
-          <td>${p.nobadan || '-'}</td>
-          <td>${p.nama}</td>
-          <td>${p.sekolah}</td>
+    <td>
+      <button class="action-btn red"
+        onclick="removeFromEvent('${join.id}')">
+        Padam
+      </button>
+    </td>
 
-        </tr>
-      `;
+  </tr>
+`;
 
       // simpan untuk export excel
       currentExportData.push({
@@ -896,10 +972,17 @@ function openAssignModal(participantId){
   const select = document.getElementById("assignEventSelect");
   select.innerHTML = "";
 
-  Object.entries(EVENTS).forEach(([id, e]) => {
+  sortEvents(
+
+  Object.entries(EVENTS).map(([id, e]) => ({
+    id,
+    ...e
+  }))
+
+).forEach(e => {
 
     select.innerHTML += `
-      <option value="${id}">
+      <option value="${e.id}">
         ${e.name} (${e.category} - ${e.gender})
       </option>
     `;
@@ -915,33 +998,54 @@ function closeModal(){
 
 async function confirmAssignEvent(){
 
-  const eventId =
-    assignEventSelect.value;
+  const eventId = assignEventSelect.value;
 
-  const check =
-    await db.collection("eventParticipants")
+  const check = await db.collection("eventParticipants")
     .where("participantId","==",selectedParticipant)
     .where("eventId","==",eventId)
     .get();
 
   if(!check.empty){
-
     alert("Peserta sudah didaftarkan");
-
     return;
   }
 
   await db.collection("eventParticipants").add({
-
-    participantId:selectedParticipant,
-    eventId:eventId
-
+    participantId: selectedParticipant,
+    eventId: eventId
   });
 
   alert("Peserta berjaya dimasukkan");
 
   closeModal();
+
+  // refresh cache
+  await initData();
+
+  // reload page semasa (sekolah view)
+  if(typeof currentSchool !== "undefined"){
+    document.getElementById("contentBody").innerHTML = "";
+loadSchoolParticipants(currentSchool);
+  }
 }
+
+async function removeFromEvent(joinId, eventId, eventName){
+
+  if(!confirm("Padam peserta dari acara ini?")) return;
+
+  await db.collection("eventParticipants")
+    .doc(joinId)
+    .delete();
+
+  alert("Berjaya dipadam");
+
+  // refresh data cache
+  await initData();
+
+  //  reload semula page event
+  loadEventParticipants(eventId, eventName);
+}
+
 
 function exportExcel(){
 
