@@ -544,20 +544,20 @@ async function loadSchools(){
   const dashboard = document.getElementById("dashboardSchools");
 
   menu.innerHTML = "";
-  dashboard.innerHTML = "";
 
-  // 🔥 guna cache PARTICIPANTS
+  // guna cache
   const participants = Object.values(PARTICIPANTS);
 
+  // ambil sekolah unik
   const schools = [...new Set(
     participants.map(p => p.sekolah).filter(Boolean)
   )];
 
   schools.sort();
 
+  // 🔥 SIDEBAR MENU
   schools.forEach(sekolah => {
 
-    // kira jumlah peserta
     const total = participants.filter(
       p => p.sekolah === sekolah
     ).length;
@@ -567,21 +567,55 @@ async function loadSchools(){
         ${sekolah} (${total})
       </div>
     `;
+  });
 
-    dashboard.innerHTML += `
-      <div class="list-item">
-        <h3>${sekolah}</h3>
+  // 🔥 DASHBOARD TABLE
+  dashboard.innerHTML = `
 
-        <p>Jumlah Peserta: ${total}</p>
+    <table>
 
-        <button onclick="loadSchoolParticipants('${sekolah}')">
-          Lihat Peserta
-        </button>
-      </div>
+      <thead>
+
+        <tr>
+
+          <th>Nama Sekolah</th>
+          <th>Jumlah Peserta</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody id="schoolTableBody"></tbody>
+
+    </table>
+  `;
+
+  const tbody = document.getElementById("schoolTableBody");
+
+  schools.forEach(sekolah => {
+
+    const total = participants.filter(
+      p => p.sekolah === sekolah
+    ).length;
+
+    tbody.innerHTML += `
+
+      <tr style="cursor:pointer"
+          onclick="loadSchoolParticipants('${sekolah}')">
+
+        <td>
+          ${sekolah}
+        </td>
+
+        <td>
+          ${total}
+        </td>
+
+      </tr>
     `;
   });
 
-  console.log("SCHOOLS LOADED", schools.length);
+  console.log("SCHOOLS LOADED");
 }
 
 async function loadSchoolParticipants(sekolah){
