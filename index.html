@@ -57,6 +57,28 @@ table td{ padding:10px; border-bottom:1px solid #ddd; }
 .green{ background:green; }
 .modal{ position:fixed; inset:0; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; }
 .modal-content{ width:400px; background:white; padding:20px; border-radius:12px; }
+
+/* LOADING BUTTON SPINNER */
+.btn-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
 </style>
 </head>
 <body>
@@ -71,7 +93,7 @@ table td{ padding:10px; border-bottom:1px solid #ddd; }
   </div>
 </div>
 
-<!-- SIDEBAR (Ditambah kelas hidden secara default untuk keselamatan UI) -->
+<!-- SIDEBAR -->
 <div id="sidebarSection" class="sidebar hidden">
   <h2>KOPK LMS</h2>
   <div class="menu-item" onclick="showDashboard()">Dashboard</div>
@@ -89,7 +111,7 @@ table td{ padding:10px; border-bottom:1px solid #ddd; }
   </div>
 </div>
 
-<!-- UTAMA (Ditambah kelas hidden secara default) -->
+<!-- UTAMA -->
 <div id="mainSection" class="main hidden">
 
   <!-- DASHBOARD -->
@@ -192,7 +214,7 @@ table td{ padding:10px; border-bottom:1px solid #ddd; }
   <div class="modal-content">
     <h3>Daftar Acara</h3>
     <select id="assignEventSelect"></select>
-    <button onclick="confirmAssignEvent()">Simpan</button>
+    <button id="btnAssignSave" onclick="confirmAssignEvent()">Simpan</button>
     <button onclick="closeModal()" class="red">Tutup</button>
   </div>
 </div>
@@ -220,23 +242,43 @@ let currentExportData = [];
 
 const EVENT_ORDER = ["100 m", "200 m", "400 m", "800 m", "1500 m", "80 m", "Lompat Jauh", "Lompat Tinggi", "Lontar Peluru", "Rejam Lembing", "Lempar Cakera"];
 
-// --- FUNGSI AUTHENTICATION ---
-function loginUser() {
-  const email = document.getElementById("loginEmail").value;
-  const kataLauan = document.getElementById("loginPassword").value;
+// --- FUNGSI SPINNER GLOBAL ---
+function setLoading(button, isLoading, text = "Sila tunggu...") {
+  if (!button) return;
+  if (isLoading) {
+    button.disabled = true;
+    button.classList.add("btn-loading");
+    button.dataset.originalText = button.innerHTML;
+    button.innerHTML = `<span class="spinner"></span>${text}`;
+  } else {
+    button.disabled = false;
+    button.classList.remove("btn-loading");
+    button.innerHTML = button.dataset.originalText || button.innerHTML;
+  }
+}
 
-  if(!email || !kataLauan) {
+// --- FUNGSI AUTHENTICATION ---
+async function loginUser() {
+  const email = document.getElementById("loginEmail").value;
+  const kataLaluan = document.getElementById("loginPassword").value;
+  const btn = document.querySelector("#authSection button");
+
+  if (!email || !kataLaluan) {
     alert("Sila isi e-mel dan kata laluan");
     return;
   }
 
-  auth.signInWithEmailAndPassword(email, kataLauan)
-    .then(() => {
-      alert("Selamat Datang!");
-      document.getElementById("loginEmail").value = "";
-      document.getElementById("loginPassword").value = "";
-    })
-    .catch((error) => { alert("Ralat: " + error.message); });
+  try {
+    setLoading(btn, true, "Logging in...");
+    await auth.signInWithEmailAndPassword(email, kataLaluan);
+    alert("Selamat Datang!");
+    document.getElementById("loginEmail").value = "";
+    document.getElementById("loginPassword").value = "";
+  } catch (error) {
+    alert("Ralat: " + error.message);
+  } finally {
+    setLoading(btn, false);
+  }
 }
 
 function logoutUser() {
@@ -303,7 +345,6 @@ function showAddEvent(){
   document.getElementById('addEventSection').classList.remove('hidden');
 }
 
-// AMBIL DATA UTAMA (Hanya dipanggil sekali sahaja semasa mula-mula masuk sistem)
 async function initData(){
   const [eventsSnap, partSnap, joinSnap] = await Promise.all([
     db.collection("events").get(),
@@ -330,39 +371,58 @@ function loadStats(){
   document.getElementById('totalAcara').innerText = Object.keys(EVENTS).length;
 }
 
-// 🔥 OPTIMASI WRITE & LOCAL MUTATION: Jimat Kos Read daripada buat initData() semula
-async function registerParticipant(){
+// 🔥 DIOPTIMASIKAN: DOM caching bersih + Spinner Kunci Butang
+async function registerParticipant() {
+  const btn = document.querySelector("#registerSection button");
+  const elNama = document.getElementById("nama");
+  const elKadoku = document.getElementById("kadoku");
+  const elIc = document.getElementById("ic");
+  const elNobadan = document.getElementById("nobadan");
+  const elSekolah = document.getElementById("sekolah");
+
   const participant = {
-    nama: nama.value,
-    kadoku: kadoku.value,
-    ic: ic.value,
-    nobadan: nobadan.value,
-    sekolah: sekolah.value
+    nama: elNama.value.trim(),
+    kadoku: elKadoku.value.trim(),
+    ic: elIc.value.trim(),
+    nobadan: elNobadan.value.trim(),
+    sekolah: elSekolah.value
   };
 
-  if(!participant.nama || !participant.sekolah) {
+  if (!participant.nama || !participant.sekolah) {
     alert("Nama dan Sekolah wajib diisi!");
     return;
   }
 
-  const docRef = await db.collection("participants").add(participant);
-  
-  // Update Cache Lokal secara Serta-merta (0 Read Cost!)
-  PARTICIPANTS[docRef.id] = { id: docRef.id, ...participant };
+  try {
+    setLoading(btn, true, "Mendaftar...");
 
-  alert("Peserta berjaya didaftarkan");
-  nama.value = ""; kadoku.value = ""; ic.value = ""; nobadan.value = ""; sekolah.selectedIndex = 0;
-  
-  loadSchools();
-  loadStats();
+    const docRef = await db.collection("participants").add(participant);
+    PARTICIPANTS[docRef.id] = { id: docRef.id, ...participant };
+
+    alert("Peserta berjaya didaftarkan");
+
+    elNama.value = "";
+    elKadoku.value = "";
+    elIc.value = "";
+    elNobadan.value = "";
+    elSekolah.selectedIndex = 0;
+
+    loadSchools();
+    loadStats();
+  } catch (error) {
+    alert("Ralat: " + error.message);
+  } finally {
+    setLoading(btn, false);
+  }
 }
 
-// 🔥 PERBAIKAN: Memasukkan parameter 'school' yang hilang sebelum ini
+// 🔥 DIOPTIMASIKAN: Ditambah Spinner Kunci Butang
 async function addEvent(){
+  const btn = document.querySelector("#addEventSection button");
   const data = {
-    name: eventName.value,
+    name: eventName.value.trim(),
     category: eventCategory.value,
-    school: eventSchool.value, // Dibetulkan di sini
+    school: eventSchool.value, 
     gender: eventGender.value
   };
 
@@ -371,15 +431,21 @@ async function addEvent(){
     return;
   }
 
-  const docRef = await db.collection("events").add(data);
-  
-  // Update Cache Lokal secara Serta-merta (0 Read Cost!)
-  EVENTS[docRef.id] = data;
-  
-  alert("Acara berjaya ditambah");
-  eventName.value = "";
-  loadEventMenu();
-  loadStats();
+  try {
+    setLoading(btn, true, "Menambah Acara...");
+    
+    const docRef = await db.collection("events").add(data);
+    EVENTS[docRef.id] = data;
+    
+    alert("Acara berjaya ditambah");
+    eventName.value = "";
+    loadEventMenu();
+    loadStats();
+  } catch (error) {
+    alert("Ralat: " + error.message);
+  } finally {
+    setLoading(btn, false);
+  }
 }
 
 function loadSchools(){
@@ -490,18 +556,19 @@ async function exportPDF(){
   doc.save(`${contentTitle.innerText}.pdf`);
 }
 
-// 🔥 OPTIMASI LOCAL MUTATION: Buang rekod lokal secara terus
 async function deleteParticipant(id){
   if(!confirm("Padam peserta ini?")) return;
-  await db.collection("participants").doc(id).delete();
-  
-  // Buang dari Cache Lokal (0 Read Cost!)
-  delete PARTICIPANTS[id];
-  EVENT_PARTICIPANTS = EVENT_PARTICIPANTS.filter(j => j.participantId !== id);
-
-  alert("Peserta dipadam");
-  loadSchools();
-  loadStats();
+  try {
+    await db.collection("participants").doc(id).delete();
+    delete PARTICIPANTS[id];
+    EVENT_PARTICIPANTS = EVENT_PARTICIPANTS.filter(j => j.participantId !== id);
+    alert("Peserta dipadam");
+    loadSchools();
+    loadStats();
+    if(currentSchool) loadSchoolParticipants(currentSchool);
+  } catch(error) {
+    alert("Ralat memadam: " + error.message);
+  }
 }
 
 function loadEventMenu(){
@@ -609,9 +676,10 @@ function openAssignModal(participantId){
 
 function closeModal(){ document.getElementById('assignModal').style.display = "none"; }
 
-// 🔥 OPTIMASI LOCAL MUTATION: Masukkan data hubungan baharu tanpa refresh internet
+// 🔥 DIOPTIMASIKAN: Ditambah Spinner Kunci Butang Simpan Modal
 async function confirmAssignEvent(){
   const eventId = assignEventSelect.value;
+  const btn = document.getElementById("btnAssignSave");
   
   const isRegistered = EVENT_PARTICIPANTS.some(j => j.participantId === selectedParticipant && j.eventId === eventId);
   if(isRegistered){ 
@@ -620,27 +688,33 @@ async function confirmAssignEvent(){
   }
 
   const newJoin = { participantId: selectedParticipant, eventId: eventId };
-  const docRef = await db.collection("eventParticipants").add(newJoin);
   
-  // Suntik ke dalam Cache Lokal secara terus (0 Read Cost!)
-  EVENT_PARTICIPANTS.push({ id: docRef.id, ...newJoin });
+  try {
+    setLoading(btn, true, "Menyimpan...");
+    const docRef = await db.collection("eventParticipants").add(newJoin);
+    EVENT_PARTICIPANTS.push({ id: docRef.id, ...newJoin });
 
-  alert("Peserta berjaya dimasukkan");
-  closeModal();
+    alert("Peserta berjaya dimasukkan");
+    closeModal();
 
-  if(currentSchool){ loadSchoolParticipants(currentSchool); }
+    if(currentSchool){ loadSchoolParticipants(currentSchool); }
+  } catch (error) {
+    alert("Ralat: " + error.message);
+  } finally {
+    setLoading(btn, false);
+  }
 }
 
-// 🔥 OPTIMASI LOCAL MUTATION: Buang hubungan dari memori terus pasca-delete
 async function removeFromEvent(joinId, eventId, eventName){
   if(!confirm("Padam peserta dari acara ini?")) return;
-  await db.collection("eventParticipants").doc(joinId).delete();
-  
-  // Buang dari Cache Lokal secara terus (0 Read Cost!)
-  EVENT_PARTICIPANTS = EVENT_PARTICIPANTS.filter(j => j.id !== joinId);
-
-  alert("Berjaya dipadam");
-  loadEventParticipants(eventId, eventName);
+  try {
+    await db.collection("eventParticipants").doc(joinId).delete();
+    EVENT_PARTICIPANTS = EVENT_PARTICIPANTS.filter(j => j.id !== joinId);
+    alert("Berjaya dipadam");
+    loadEventParticipants(eventId, eventName);
+  } catch(error) {
+    alert("Ralat memadam: " + error.message);
+  }
 }
 
 function exportExcel(){
