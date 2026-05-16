@@ -1,275 +1,122 @@
 <!DOCTYPE html>
 <html lang="ms">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sistem Pendaftaran KOPK LMS</title>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- JS PDF & XLSX -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
 <style>
+*{ box-sizing:border-box; }
+body{ margin:0; font-family:Arial, sans-serif; display:flex; background:#f1f5f9; }
 
-*{
-  box-sizing:border-box;
+/* AUTH SECTION STYLING */
+.auth-container {
+  display: flex; justify-content: center; align-items: center;
+  width: 100vw; height: 100vh; background: #0f172a;
+  position: fixed; inset: 0; z-index: 9999;
 }
-
-body{
-  margin:0;
-  font-family:Arial, sans-serif;
-  display:flex;
-  background:#f1f5f9;
+.auth-card {
+  background: white; padding: 30px; border-radius: 12px;
+  width: 100%; max-width: 400px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }
+.auth-card h2 { margin-top: 0; text-align: center; color: #0f172a; }
 
-.sidebar{
-  width:260px;
-  background:#0f172a;
-  color:white;
-  height:100vh;
-  overflow-y:auto;
-  position:fixed;
-}
+/* APP LAYOUT */
+.sidebar{ width:260px; background:#0f172a; color:white; height:100vh; overflow-y:auto; position:fixed; }
+.sidebar h2{ text-align:center; padding:20px 0; margin:0; border-bottom:1px solid rgba(255,255,255,0.1); }
+.menu-item{ padding:15px 20px; cursor:pointer; border-bottom:1px solid rgba(255,255,255,0.05); }
+.menu-item:hover{ background:#1e293b; }
+.submenu{ display:none; background:#1e293b; }
+.submenu div{ padding:12px 35px; cursor:pointer; }
+.submenu div:hover{ background:#334155; }
 
-.sidebar h2{
-  text-align:center;
-  padding:20px 0;
-  margin:0;
-  border-bottom:1px solid rgba(255,255,255,0.1);
-}
+.main{ margin-left:260px; width:calc(100% - 260px); padding:20px; }
+.card{ background:white; padding:20px; border-radius:12px; margin-bottom:20px; box-shadow:0 2px 5px rgba(0,0,0,0.1); }
+input, select, button{ width:100%; padding:10px; margin-top:10px; border-radius:8px; border:1px solid #ccc; }
+button{ background:#2563eb; color:white; border:none; cursor:pointer; }
+button:hover{ background:#1d4ed8; }
 
-.menu-item{
-  padding:15px 20px;
-  cursor:pointer;
-  border-bottom:1px solid rgba(255,255,255,0.05);
-}
-
-.menu-item:hover{
-  background:#1e293b;
-}
-
-.submenu{
-  display:none;
-  background:#1e293b;
-}
-
-.submenu div{
-  padding:12px 35px;
-  cursor:pointer;
-}
-
-.submenu div:hover{
-  background:#334155;
-}
-
-.main{
-  margin-left:260px;
-  width:calc(100% - 260px);
-  padding:20px;
-}
-
-.card{
-  background:white;
-  padding:20px;
-  border-radius:12px;
-  margin-bottom:20px;
-  box-shadow:0 2px 5px rgba(0,0,0,0.1);
-}
-
-input, select, button{
-  width:100%;
-  padding:10px;
-  margin-top:10px;
-  border-radius:8px;
-  border:1px solid #ccc;
-}
-
-button{
-  background:#2563eb;
-  color:white;
-  border:none;
-  cursor:pointer;
-}
-
-button:hover{
-  background:#1d4ed8;
-}
-
-.stats{
-  display:flex;
-  gap:15px;
-  flex-wrap:wrap;
-}
-
-.stat-box{
-  flex:1;
-  min-width:180px;
-  background:#2563eb;
-  color:white;
-  padding:20px;
-  border-radius:10px;
-  text-align:center;
-  font-size:18px;
-}
-
-.hidden{
-  display:none;
-}
-
-.list-item{
-  background:#e2e8f0;
-  padding:15px;
-  border-radius:10px;
-  margin-bottom:10px;
-}
-
-.list-item h3{
-  margin:0;
-}
-
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:15px;
-}
-
-table th{
-  background:#0f172a;
-  color:white;
-  padding:12px;
-}
-
-table td{
-  padding:10px;
-  border-bottom:1px solid #ddd;
-}
-
-.action-btn{
-  width:auto;
-  padding:7px 12px;
-  margin:2px;
-}
-
-.red{
-  background:red;
-}
-
-.green{
-  background:green;
-}
-
-.modal{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,0.5);
-  display:none;
-  justify-content:center;
-  align-items:center;
-}
-
-.modal-content{
-  width:400px;
-  background:white;
-  padding:20px;
-  border-radius:12px;
-}
-
+.stats{ display:flex; gap:15px; flex-wrap:wrap; }
+.stat-box{ flex:1; min-width:180px; background:#2563eb; color:white; padding:20px; border-radius:10px; text-align:center; font-size:18px; }
+.hidden{ display:none !important; }
+table{ width:100%; border-collapse:collapse; margin-top:15px; }
+table th{ background:#0f172a; color:white; padding:12px; }
+table td{ padding:10px; border-bottom:1px solid #ddd; }
+.action-btn{ width:auto; padding:7px 12px; margin:2px; }
+.red{ background:red; } .red:hover{ background:#b91c1c; }
+.green{ background:green; }
+.modal{ position:fixed; inset:0; background:rgba(0,0,0,0.5); display:none; justify-content:center; align-items:center; }
+.modal-content{ width:400px; background:white; padding:20px; border-radius:12px; }
 </style>
 </head>
 <body>
 
-<div class="sidebar">
-
-  <h2>KOPK LMS</h2>
-
-  <div class="menu-item" onclick="showDashboard()">
-    Dashboard
+<!-- HALAMAN LOGIN -->
+<div id="authSection" class="auth-container">
+  <div class="auth-card">
+    <h2>KOPK LMS Login</h2>
+    <input type="email" id="loginEmail" placeholder="E-mel Rasmi">
+    <input type="password" id="loginPassword" placeholder="Kata Laluan">
+    <button onclick="loginUser()">Log Masuk</button>
   </div>
-
-  <div class="menu-item" onclick="showRegister()">
-    Daftar Peserta
-  </div>
-
-  <div class="menu-item" onclick="showAddEvent()">
-    Tambah Acara
-  </div>
-
-  <div class="menu-item" onclick="toggleMenu('eventMenu')">
-    Acara ▼
-  </div>
-
-  <div id="eventMenu" class="submenu"></div>
-
-  <div class="menu-item" onclick="toggleMenu('schoolMenu')">
-    Sekolah ▼
-  </div>
-
-  <div id="schoolMenu" class="submenu"></div>
-
 </div>
 
-<div class="main">
+<!-- SIDEBAR (Ditambah kelas hidden secara default untuk keselamatan UI) -->
+<div id="sidebarSection" class="sidebar hidden">
+  <h2>KOPK LMS</h2>
+  <div class="menu-item" onclick="showDashboard()">Dashboard</div>
+  <div class="menu-item" onclick="showRegister()">Daftar Peserta</div>
+  <div class="menu-item" onclick="showAddEvent()">Tambah Acara</div>
+  
+  <div class="menu-item" onclick="toggleMenu('eventMenu')">Acara ▼</div>
+  <div id="eventMenu" class="submenu"></div>
+
+  <div class="menu-item" onclick="toggleMenu('schoolMenu')">Sekolah ▼</div>
+  <div id="schoolMenu" class="submenu"></div>
+  
+  <div class="menu-item red" onclick="logoutUser()" style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.2)">
+    Log Keluar ➔
+  </div>
+</div>
+
+<!-- UTAMA (Ditambah kelas hidden secara default) -->
+<div id="mainSection" class="main hidden">
 
   <!-- DASHBOARD -->
   <div id="dashboardSection">
-
     <div class="card">
-
       <h2>Statistik</h2>
-
       <div class="stats">
-
-        <div class="stat-box">
-          Jumlah Peserta
-          <br><br>
-          <span id="totalPeserta">0</span>
-        </div>
-
-        <div class="stat-box">
-          Jumlah Sekolah
-          <br><br>
-          <span id="totalSekolah">0</span>
-        </div>
-
-        <div class="stat-box">
-          Jumlah Acara
-          <br><br>
-          <span id="totalAcara">0</span>
-        </div>
-
+        <div class="stat-box">Jumlah Peserta<br><br><span id="totalPeserta">0</span></div>
+        <div class="stat-box">Jumlah Sekolah<br><br><span id="totalSekolah">0</span></div>
+        <div class="stat-box">Jumlah Acara<br><br><span id="totalAcara">0</span></div>
       </div>
-
     </div>
-
     <div class="card">
-
       <h2>Senarai Sekolah</h2>
-
       <div id="dashboardSchools"></div>
-
     </div>
-
   </div>
 
   <!-- REGISTER -->
   <div id="registerSection" class="hidden card">
-
     <h2>Pendaftaran Peserta</h2>
-
     <input type="text" id="nama" placeholder="Nama Peserta">
-
     <input type="text" id="kadoku" placeholder="No Kad OKU">
-
     <input type="text" id="ic" placeholder="No IC">
-
     <input type="text" id="nobadan" placeholder="No Badan">
-
     <select id="sekolah">
-
       <option value="">Pilih Sekolah</option>
-
       <option value="SMK Toh Johan">SMK Toh Johan</option>
       <option value="SMK Bukit Jana">SMK Bukit Jana</option>
       <option value="SMK Kamunting">SMK Kamunting</option>
@@ -307,372 +154,281 @@ table td{
       <option value="SK Sultan Idris II">SK Sultan Idris II</option>
       <option value="SK Sg Bayor">SK Sg Bayor</option>
       <option value="SK Pendidikan Khas">SK Pendidikan Khas</option>
-      
-
     </select>
-
-    <button onclick="registerParticipant()">
-      Daftar Peserta
-    </button>
-
+    <button onclick="registerParticipant()">Daftar Peserta</button>
   </div>
 
   <!-- ADD EVENT -->
   <div id="addEventSection" class="hidden card">
-
     <h2>Tambah Acara</h2>
-
     <input type="text" id="eventName" placeholder="Nama Acara">
-
     <select id="eventCategory">
       <option value="B12">B12</option>
       <option value="B15">B15</option>
       <option value="B19">B19</option>
       <option value="Terbuka">Terbuka</option>
     </select>
-
     <select id="eventSchool">
       <option value="Sekolah Rendah">Sekolah Rendah</option>
       <option value="Sekolah Menengah">Sekolah Menengah</option>
     </select>
-
     <select id="eventGender">
       <option value="Lelaki">Lelaki</option>
       <option value="Perempuan">Perempuan</option>
     </select>
-
-    <button onclick="addEvent()">
-      Tambah Acara
-    </button>
-
+    <button onclick="addEvent()">Tambah Acara</button>
   </div>
 
   <!-- CONTENT -->
   <div id="contentSection" class="hidden card">
-
     <h2 id="contentTitle"></h2>
-
     <div id="contentBody"></div>
-
   </div>
 
 </div>
 
 <!-- MODAL -->
 <div class="modal" id="assignModal">
-
   <div class="modal-content">
-
     <h3>Daftar Acara</h3>
-
     <select id="assignEventSelect"></select>
-
-    <button onclick="confirmAssignEvent()">
-      Simpan
-    </button>
-
-    <button onclick="closeModal()" class="red">
-      Tutup
-    </button>
-
+    <button onclick="confirmAssignEvent()">Simpan</button>
+    <button onclick="closeModal()" class="red">Tutup</button>
   </div>
-
 </div>
 
 <script>
-
 const firebaseConfig = {
-
   apiKey: "AIzaSyCaegle-pxirfzoxTMIdW444IHnKK-kGVc",
   authDomain: "kopk-lms-872f8.firebaseapp.com",
   projectId: "kopk-lms-872f8",
   storageBucket: "kopk-lms-872f8.firebasestorage.app",
   messagingSenderId: "644416357339",
   appId: "1:644416357339:web:af6c526b38063f85395dfe"
-
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const db = firebase.firestore();
+const auth = firebase.auth(); 
 
 let currentSchool = null;
 let EVENTS = {};
 let PARTICIPANTS = {};
 let EVENT_PARTICIPANTS = [];
+let selectedParticipant = null;
+let currentExportData = [];
 
-const EVENT_ORDER = [
-  "100 m",
-  "200 m",
-  "400 m",
-  "800 m",
-  "1500 m",
-  "80 m",
-  "Lompat Jauh",
-  "Lompat Tinggi",
-  "Lontar Peluru",
-  "Rejam Lembing",
-  "Lempar Cakera"
-];
+const EVENT_ORDER = ["100 m", "200 m", "400 m", "800 m", "1500 m", "80 m", "Lompat Jauh", "Lompat Tinggi", "Lontar Peluru", "Rejam Lembing", "Lempar Cakera"];
 
+// --- FUNGSI AUTHENTICATION ---
+function loginUser() {
+  const email = document.getElementById("loginEmail").value;
+  const kataLauan = document.getElementById("loginPassword").value;
+
+  if(!email || !kataLauan) {
+    alert("Sila isi e-mel dan kata laluan");
+    return;
+  }
+
+  auth.signInWithEmailAndPassword(email, kataLauan)
+    .then(() => {
+      alert("Selamat Datang!");
+      document.getElementById("loginEmail").value = "";
+      document.getElementById("loginPassword").value = "";
+    })
+    .catch((error) => { alert("Ralat: " + error.message); });
+}
+
+function logoutUser() {
+  if(confirm("Adakah anda pasti mahu log keluar?")) {
+    auth.signOut().then(() => { alert("Anda telah log keluar."); });
+  }
+}
+
+auth.onAuthStateChanged(async (user) => {
+  const authSection = document.getElementById("authSection");
+  const sidebarSection = document.getElementById("sidebarSection");
+  const mainSection = document.getElementById("mainSection");
+
+  if (user) {
+    authSection.classList.add("hidden");
+    sidebarSection.classList.remove("hidden");
+    mainSection.classList.remove("hidden");
+    await initData();
+    showDashboard();
+  } else {
+    authSection.classList.remove("hidden");
+    sidebarSection.classList.add("hidden");
+    mainSection.classList.add("hidden");
+    EVENTS = {};
+    PARTICIPANTS = {};
+    EVENT_PARTICIPANTS = [];
+  }
+});
+
+// --- OPERASI SISTEM ---
 function sortEvents(events){
-
   return events.sort((a, b) => {
-
     const getOrder = (name) => {
-
-      const found = EVENT_ORDER.find(event =>
-        name.toLowerCase().includes(event.toLowerCase())
-      );
-
-      return found
-        ? EVENT_ORDER.indexOf(found)
-        : 999;
+      const found = EVENT_ORDER.find(event => name.toLowerCase().includes(event.toLowerCase()));
+      return found ? EVENT_ORDER.indexOf(found) : 999;
     };
-
     return getOrder(a.name) - getOrder(b.name);
   });
 }
 
-let selectedParticipant = null;
-let currentExportData = [];
-
 function toggleMenu(menuId){
-
   const menu = document.getElementById(menuId);
-
-  menu.style.display =
-    menu.style.display === "block"
-    ? "none"
-    : "block";
+  menu.style.display = menu.style.display === "block" ? "none" : "block";
 }
 
 function hideAll(){
-
-  document.querySelectorAll('.main > div')
-    .forEach(div => div.classList.add('hidden'));
+  document.querySelectorAll('.main > div').forEach(div => div.classList.add('hidden'));
 }
 
 function showDashboard(){
-
   hideAll();
-
-  dashboardSection.classList.remove('hidden');
-
+  document.getElementById('dashboardSection').classList.remove('hidden');
   loadStats();
-
   loadSchools();
-
 }
 
 function showRegister(){
-
   hideAll();
-
-  registerSection.classList.remove('hidden');
+  document.getElementById('registerSection').classList.remove('hidden');
 }
 
 function showAddEvent(){
-
   hideAll();
-
-  addEventSection.classList.remove('hidden');
+  document.getElementById('addEventSection').classList.remove('hidden');
 }
 
+// AMBIL DATA UTAMA (Hanya dipanggil sekali sahaja semasa mula-mula masuk sistem)
 async function initData(){
-
   const [eventsSnap, partSnap, joinSnap] = await Promise.all([
     db.collection("events").get(),
     db.collection("participants").get(),
     db.collection("eventParticipants").get()
   ]);
 
-  EVENTS = {};
-  PARTICIPANTS = {};
-  EVENT_PARTICIPANTS = [];
+  EVENTS = {}; PARTICIPANTS = {}; EVENT_PARTICIPANTS = [];
 
-  eventsSnap.forEach(doc => {
-    EVENTS[doc.id] = doc.data();
-  });
+  eventsSnap.forEach(doc => { EVENTS[doc.id] = doc.data(); });
+  partSnap.forEach(doc => { PARTICIPANTS[doc.id] = { id: doc.id, ...doc.data() }; });
+  joinSnap.forEach(doc => { EVENT_PARTICIPANTS.push({ id: doc.id, ...doc.data() }); });
 
-  partSnap.forEach(doc => {
-    PARTICIPANTS[doc.id] = { id: doc.id, ...doc.data() };
-  });
-
-  joinSnap.forEach(doc => {
-    EVENT_PARTICIPANTS.push(doc.data());
-  });
-
+  loadEventMenu(); 
   console.log("CACHE READY");
 }
 
-async function loadStats(){
+function loadStats(){
+  const participants = Object.values(PARTICIPANTS);
+  const schools = new Set(participants.map(p => p.sekolah).filter(Boolean));
 
-  const participants = await db.collection("participants").get();
-  const events = await db.collection("events").get();
-
-  const schools = new Set();
-
-  participants.forEach(doc => {
-    schools.add(doc.data().sekolah);
-  });
-
-  totalPeserta.innerText = participants.size;
-  totalSekolah.innerText = schools.size;
-  totalAcara.innerText = events.size;
+  document.getElementById('totalPeserta').innerText = participants.length;
+  document.getElementById('totalSekolah').innerText = schools.size;
+  document.getElementById('totalAcara').innerText = Object.keys(EVENTS).length;
 }
 
+// 🔥 OPTIMASI WRITE & LOCAL MUTATION: Jimat Kos Read daripada buat initData() semula
 async function registerParticipant(){
-
   const participant = {
-
     nama: nama.value,
     kadoku: kadoku.value,
     ic: ic.value,
     nobadan: nobadan.value,
     sekolah: sekolah.value
-
   };
 
-  await db.collection("participants").add(participant);
+  if(!participant.nama || !participant.sekolah) {
+    alert("Nama dan Sekolah wajib diisi!");
+    return;
+  }
 
-  await initData();
+  const docRef = await db.collection("participants").add(participant);
+  
+  // Update Cache Lokal secara Serta-merta (0 Read Cost!)
+  PARTICIPANTS[docRef.id] = { id: docRef.id, ...participant };
 
   alert("Peserta berjaya didaftarkan");
-
-  nama.value = "";
-  kadoku.value = "";
-  ic.value = "";
-  nobadan.value = "";
-  sekolah.selectedIndex = 0;
-
+  nama.value = ""; kadoku.value = ""; ic.value = ""; nobadan.value = ""; sekolah.selectedIndex = 0;
+  
   loadSchools();
   loadStats();
 }
 
+// 🔥 PERBAIKAN: Memasukkan parameter 'school' yang hilang sebelum ini
 async function addEvent(){
-
   const data = {
-
     name: eventName.value,
     category: eventCategory.value,
+    school: eventSchool.value, // Dibetulkan di sini
     gender: eventGender.value
-
   };
 
-  await db.collection("events").add(data);
+  if(!data.name) {
+    alert("Nama Acara tidak boleh kosong!");
+    return;
+  }
 
+  const docRef = await db.collection("events").add(data);
+  
+  // Update Cache Lokal secara Serta-merta (0 Read Cost!)
+  EVENTS[docRef.id] = data;
+  
   alert("Acara berjaya ditambah");
-
   eventName.value = "";
-
   loadEventMenu();
+  loadStats();
 }
 
-async function loadSchools(){
-
+function loadSchools(){
   const menu = document.getElementById("schoolMenu");
   const dashboard = document.getElementById("dashboardSchools");
-
   menu.innerHTML = "";
 
-  // guna cache
   const participants = Object.values(PARTICIPANTS);
+  const schools = [...new Set(participants.map(p => p.sekolah).filter(Boolean))].sort();
 
-  // ambil sekolah unik
-  const schools = [...new Set(
-    participants.map(p => p.sekolah).filter(Boolean)
-  )];
-
-  schools.sort();
-
-  // 🔥 SIDEBAR MENU
   schools.forEach(sekolah => {
-
-    const total = participants.filter(
-      p => p.sekolah === sekolah
-    ).length;
-
-    menu.innerHTML += `
-      <div onclick="loadSchoolParticipants('${sekolah}')">
-        ${sekolah} (${total})
-      </div>
-    `;
+    const total = participants.filter(p => p.sekolah === sekolah).length;
+    menu.innerHTML += `<div onclick="loadSchoolParticipants('${sekolah}')">${sekolah} (${total})</div>`;
   });
 
-  // 🔥 DASHBOARD TABLE
   dashboard.innerHTML = `
-
     <table>
-
-      <thead>
-
-        <tr>
-
-          <th>Nama Sekolah</th>
-          <th>Jumlah Peserta</th>
-
-        </tr>
-
-      </thead>
-
+      <thead><tr><th>Nama Sekolah</th><th>Jumlah Peserta</th></tr></thead>
       <tbody id="schoolTableBody"></tbody>
-
     </table>
   `;
 
   const tbody = document.getElementById("schoolTableBody");
-
   schools.forEach(sekolah => {
-
-    const total = participants.filter(
-      p => p.sekolah === sekolah
-    ).length;
-
+    const total = participants.filter(p => p.sekolah === sekolah).length;
     tbody.innerHTML += `
-
-      <tr style="cursor:pointer"
-          onclick="loadSchoolParticipants('${sekolah}')">
-
-        <td>
-          ${sekolah}
-        </td>
-
-        <td>
-          ${total}
-        </td>
-
-      </tr>
-    `;
+      <tr style="cursor:pointer" onclick="loadSchoolParticipants('${sekolah}')">
+        <td>${sekolah}</td>
+        <td>${total}</td>
+      </tr>`;
   });
-
-  console.log("SCHOOLS LOADED");
 }
 
-async function loadSchoolParticipants(sekolah){
-
+function loadSchoolParticipants(sekolah){
   currentSchool = sekolah;
-
   hideAll();
+  const contentSection = document.getElementById('contentSection');
+  const contentTitle = document.getElementById('contentTitle');
   contentSection.classList.remove('hidden');
-
   contentTitle.innerText = sekolah;
 
   const body = document.getElementById("contentBody");
-
   body.innerHTML = `
     <button onclick="exportExcel()">Export Excel</button>
-    <button onclick="exportPDF()">
-  Export PDF
-</button>
+    <button onclick="exportPDF()">Export PDF</button>
     <table>
       <thead>
         <tr>
-          <th>No Badan</th>
-          <th>Nama</th>
-          <th>IC</th>
-          <th>Acara</th>
-          <th>Tindakan</th>
+          <th>No Badan</th><th>Nama</th><th>IC</th><th>Acara</th><th>Tindakan</th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -680,23 +436,14 @@ async function loadSchoolParticipants(sekolah){
   `;
 
   const tbody = document.getElementById("tableBody");
-
-  // filter participants by school (FAST - no DB call)
-  const filtered = Object.values(PARTICIPANTS)
-    .filter(p => p.sekolah === sekolah);
-
+  const filtered = Object.values(PARTICIPANTS).filter(p => p.sekolah === sekolah);
   currentExportData = [];
 
   filtered.forEach(p => {
-
-    // cari event join (FAST array filter)
-    const joins = EVENT_PARTICIPANTS
-      .filter(j => j.participantId === p.id);
-
+    const joins = EVENT_PARTICIPANTS.filter(j => j.participantId === p.id);
     const acaraList = joins.map(j => {
       const e = EVENTS[j.eventId];
-      if(!e) return null;
-      return `${e.name} (${e.category} - ${e.gender})`;
+      return e ? `${e.name} (${e.category} - ${e.gender})` : null;
     }).filter(Boolean);
 
     tbody.innerHTML += `
@@ -706,18 +453,10 @@ async function loadSchoolParticipants(sekolah){
         <td>${p.ic || '-'}</td>
         <td>${acaraList.join("<br>") || '-'}</td>
         <td>
-          <button class="action-btn green"
-            onclick="openAssignModal('${p.id}')">
-            Daftar Acara
-          </button>
-
-          <button class="action-btn red"
-            onclick="deleteParticipant('${p.id}')">
-            Padam
-          </button>
+          <button class="action-btn green" onclick="openAssignModal('${p.id}')">Daftar Acara</button>
+          <button class="action-btn red" onclick="deleteParticipant('${p.id}')">Padam</button>
         </td>
-      </tr>
-    `;
+      </tr>`;
 
     currentExportData.push({
       "No Badan": p.nobadan || '-',
@@ -731,450 +470,187 @@ async function loadSchoolParticipants(sekolah){
 }
 
 async function exportPDF(){
-
-  if(currentExportData.length === 0){
-    alert("Tiada data untuk export");
-    return;
-  }
-
+  if(currentExportData.length === 0){ alert("Tiada data untuk export"); return; }
   const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'landscape' });
+  const contentTitle = document.getElementById('contentTitle');
 
-  const doc = new jsPDF({
-    orientation: 'landscape'
-  });
-
-  // TITLE
   doc.setFontSize(16);
-  doc.text(
-    `Senarai Peserta - ${contentTitle.innerText}`,
-    14,
-    15
-  );
+  doc.text(`Senarai Peserta - ${contentTitle.innerText}`, 14, 15);
 
-  // TABLE
   doc.autoTable({
-
     startY: 25,
-
-    head: [[
-      'No Badan',
-      'Nama',
-      'No IC',
-      'No Kad OKU',
-      'Acara Disertai'
-    ]],
-
-    body: currentExportData.map(p => [
-      p['No Badan'] || '-',
-      p['Nama'] || '-',
-      p['IC'] || '-',
-      p['No Kad OKU'] || '-',
-      p['Acara'] || '-'
-    ]),
-
-    styles: {
-      fontSize: 8,
-      cellPadding: 3,
-      overflow: 'linebreak'
-    },
-
-    headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: 255,
-      fontStyle: 'bold'
-    },
-
-    columnStyles: {
-      0: { cellWidth: 20 },
-      1: { cellWidth: 45 },
-      2: { cellWidth: 35 },
-      3: { cellWidth: 35 },
-      4: { cellWidth: 100 }
-    }
-
+    head: [['No Badan', 'Nama', 'No IC', 'No Kad OKU', 'Acara Disertai']],
+    body: currentExportData.map(p => [p['No Badan'], p['Nama'], p['IC'], p['No Kad OKU'], p['Acara']]),
+    styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
+    headStyles: { fillColor: [15, 23, 42], textColor: 255, fontStyle: 'bold' },
+    columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 45 }, 2: { cellWidth: 35 }, 3: { cellWidth: 35 }, 4: { cellWidth: 100 } }
   });
 
-  doc.save(
-    `${contentTitle.innerText}.pdf`
-  );
+  doc.save(`${contentTitle.innerText}.pdf`);
 }
 
+// 🔥 OPTIMASI LOCAL MUTATION: Buang rekod lokal secara terus
 async function deleteParticipant(id){
-
-  const confirmDelete =
-    confirm("Padam peserta ini?");
-
-  if(!confirmDelete) return;
-
-  await db.collection("participants")
-    .doc(id)
-    .delete();
-
-  await initData();
+  if(!confirm("Padam peserta ini?")) return;
+  await db.collection("participants").doc(id).delete();
+  
+  // Buang dari Cache Lokal (0 Read Cost!)
+  delete PARTICIPANTS[id];
+  EVENT_PARTICIPANTS = EVENT_PARTICIPANTS.filter(j => j.participantId !== id);
 
   alert("Peserta dipadam");
-
   loadSchools();
   loadStats();
 }
 
 function loadEventMenu(){
-
   const menu = document.getElementById("eventMenu");
-
   menu.innerHTML = "";
-
   const grouped = {};
 
-  // ambil semua event
-  const allEvents = Object.entries(EVENTS).map(([id, e]) => ({
-    id,
-    ...e
-  }));
-
-  // sort event dulu
+  const allEvents = Object.entries(EVENTS).map(([id, e]) => ({ id, ...e }));
   const sortedEvents = sortEvents(allEvents);
 
-  // grouping
   sortedEvents.forEach(e => {
-
     let key = "Lain-lain";
+    if(e.name.toLowerCase().includes("100")){ key = "100 m"; }
+    else if(e.name.toLowerCase().includes("200")){ key = "200 m"; }
+    else if(e.name.toLowerCase().includes("400")){ key = "400 m"; }
+    else if(e.name.toLowerCase().includes("800")){ key = "800 m"; }
+    else if(e.name.toLowerCase().includes("1500")){ key = "1500 m"; }
+    else if(e.name.toLowerCase().includes("80")){ key = "80 m"; }
+    else if(e.name.toLowerCase().includes("lompat jauh")){ key = "Lompat Jauh"; }
+    else if(e.name.toLowerCase().includes("lompat tinggi")){ key = "Lompat Tinggi"; }
+    else if(e.name.toLowerCase().includes("lontar peluru")){ key = "Lontar Peluru"; }
+    else if(e.name.toLowerCase().includes("lempar cakera")){ key = "Lempar Cakera"; }
+    else if(e.name.toLowerCase().includes("rejam lembing")){ key = "Rejam Lembing"; }
 
-    if(e.name.toLowerCase().includes("100")){
-      key = "100 m";
-    }
-    else if(e.name.toLowerCase().includes("200")){
-      key = "200 m";
-    }
-    else if(e.name.toLowerCase().includes("400")){
-      key = "400 m";
-    }
-    else if(e.name.toLowerCase().includes("800")){
-      key = "800 m";
-    }
-    else if(e.name.toLowerCase().includes("1500")){
-      key = "1500 m";
-    }
-    else if(e.name.toLowerCase().includes("80")){
-      key = "80 m";
-    }
-    else if(e.name.toLowerCase().includes("lompat jauh")){
-      key = "Lompat Jauh";
-    }
-    else if(e.name.toLowerCase().includes("lompat tinggi")){
-      key = "Lompat Tinggi";
-    }
-    else if(e.name.toLowerCase().includes("lontar peluru")){
-      key = "Lontar Peluru";
-    }
-    else if(e.name.toLowerCase().includes("lempar cakera")){
-      key = "Lempar Cakera";
-    }
-    else if(e.name.toLowerCase().includes("rejam lembing")){
-      key = "Rejam Lembing";
-    }
-
-    if(!grouped[key]){
-      grouped[key] = [];
-    }
-
+    if(!grouped[key]){ grouped[key] = []; }
     grouped[key].push(e);
   });
 
-  // ikut urutan EVENT_ORDER
   EVENT_ORDER.forEach(category => {
-
     if(!grouped[category]) return;
-
-    const submenuId =
-      category.replace(/\s/g,'') + "Menu";
+    const submenuId = category.replace(/\s/g,'') + "Menu";
 
     menu.innerHTML += `
-
-      <div onclick="toggleMenu('${submenuId}')"
-           class="menu-item">
-
-        ${category} ▼
-
-      </div>
-
+      <div onclick="toggleMenu('${submenuId}')" class="menu-item">${category} ▼</div>
       <div id="${submenuId}" class="submenu"></div>
-
     `;
 
     const sub = document.getElementById(submenuId);
-
     grouped[category].forEach(e => {
-
-      sub.innerHTML += `
-
-        <div onclick="loadEventParticipants('${e.id}','${e.name}')">
-
-          ${e.name}
-          (${e.category} - ${e.gender})
-
-        </div>
-
-      `;
+      sub.innerHTML += `<div onclick="loadEventParticipants('${e.id}','${e.name}')">${e.name} (${e.category} - ${e.gender})</div>`;
     });
-
   });
-
-  console.log("EVENT MENU READY");
 }
 
-async function loadEventParticipants(eventId, eventName){
-
+function loadEventParticipants(eventId, eventName){
   hideAll();
-
+  const contentSection = document.getElementById('contentSection');
+  const contentTitle = document.getElementById('contentTitle');
   contentSection.classList.remove('hidden');
-
   contentTitle.innerText = eventName;
 
   const body = document.getElementById("contentBody");
-
   body.innerHTML = `
-
-    <button onclick="exportEventExcel()">
-      Export Excel
-    </button>
-
+    <button onclick="exportEventExcel()">Export Excel</button>
     <table>
-
-      <thead>
-
-        <tr>
-
-          <th>No Badan</th>
-          <th>Nama</th>
-          <th>Sekolah</th>
-
-        </tr>
-
-      </thead>
-
+      <thead><tr><th>No Badan</th><th>Nama</th><th>Sekolah</th><th>Tindakan</th></tr></thead>
       <tbody id="eventTable"></tbody>
-
     </table>
   `;
 
   const tbody = document.getElementById("eventTable");
-
   currentExportData = [];
 
-  const joins = await db.collection("eventParticipants")
-    .where("eventId","==",eventId)
-    .get();
+  const filteredJoins = EVENT_PARTICIPANTS.filter(j => j.eventId === eventId);
 
-  for(const join of joins.docs){
-
-    const data = join.data();
-
-    const participant =
-      await db.collection("participants")
-      .doc(data.participantId)
-      .get();
-
-    if(participant.exists){
-
-      const p = participant.data();
-
+  filteredJoins.forEach(join => {
+    const p = PARTICIPANTS[join.participantId];
+    if(p){
       tbody.innerHTML += `
-  <tr>
+        <tr>
+          <td>${p.nobadan || '-'}</td>
+          <td>${p.nama}</td>
+          <td>${p.sekolah}</td>
+          <td><button class="action-btn red" onclick="removeFromEvent('${join.id}','${eventId}','${eventName}')">Padam</button></td>
+        </tr>`;
 
-    <td>${p.nobadan || '-'}</td>
-    <td>${p.nama}</td>
-    <td>${p.sekolah}</td>
-
-    <td>
-      <button class="action-btn red"
-        onclick="removeFromEvent('${join.id}')">
-        Padam
-      </button>
-    </td>
-
-  </tr>
-`;
-
-      // simpan untuk export excel
       currentExportData.push({
-
-        "Nama Acara": eventName,
-        "Nama Peserta": p.nama,
-        "No Badan": p.nobadan || '-',
-        "Nama Sekolah": p.sekolah
-
+        "Nama Acara": eventName, "Nama Peserta": p.nama, "No Badan": p.nobadan || '-', "Nama Sekolah": p.sekolah
       });
     }
-  }
+  });
 }
 
 function exportEventExcel(){
-
-  if(currentExportData.length === 0){
-
-    alert("Tiada data untuk export");
-    return;
-  }
-
-  const worksheet =
-    XLSX.utils.json_to_sheet(currentExportData);
-
-// 🔥 COLUMN SIZE
-  worksheet['!cols'] = [
-    { wch: 35 }, // Nama Acara
-    { wch: 30 }, // Nama Peserta
-    { wch: 15 }, // No Badan
-    { wch: 30 }  // Sekolah
-  ];
-
-  const workbook =
-    XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    worksheet,
-    "Acara"
-  );
-
-  // ambil nama acara
-  const fileName =
-    contentTitle.innerText
-      .replace(/\s+/g, "_");
-
-  XLSX.writeFile(
-    workbook,
-    fileName + ".xlsx"
-  );
+  if(currentExportData.length === 0){ alert("Tiada data untuk export"); return; }
+  const worksheet = XLSX.utils.json_to_sheet(currentExportData);
+  worksheet['!cols'] = [{ wch: 35 }, { wch: 30 }, { wch: 15 }, { wch: 30 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Acara");
+  const contentTitle = document.getElementById('contentTitle');
+  const fileName = contentTitle.innerText.replace(/\s+/g, "_");
+  XLSX.writeFile(workbook, fileName + ".xlsx");
 }
 
 function openAssignModal(participantId){
-
   selectedParticipant = participantId;
-
   const select = document.getElementById("assignEventSelect");
   select.innerHTML = "";
 
-  sortEvents(
-
-  Object.entries(EVENTS).map(([id, e]) => ({
-    id,
-    ...e
-  }))
-
-).forEach(e => {
-
-    select.innerHTML += `
-      <option value="${e.id}">
-        ${e.name} (${e.category} - ${e.gender})
-      </option>
-    `;
+  sortEvents(Object.entries(EVENTS).map(([id, e]) => ({ id, ...e }))).forEach(e => {
+    select.innerHTML += `<option value="${e.id}">${e.name} (${e.category} - ${e.gender})</option>`;
   });
-
-  assignModal.style.display = "flex";
+  document.getElementById('assignModal').style.display = "flex";
 }
 
-function closeModal(){
+function closeModal(){ document.getElementById('assignModal').style.display = "none"; }
 
-  assignModal.style.display = "none";
-}
-
+// 🔥 OPTIMASI LOCAL MUTATION: Masukkan data hubungan baharu tanpa refresh internet
 async function confirmAssignEvent(){
-
   const eventId = assignEventSelect.value;
-
-  const check = await db.collection("eventParticipants")
-    .where("participantId","==",selectedParticipant)
-    .where("eventId","==",eventId)
-    .get();
-
-  if(!check.empty){
-    alert("Peserta sudah didaftarkan");
-    return;
+  
+  const isRegistered = EVENT_PARTICIPANTS.some(j => j.participantId === selectedParticipant && j.eventId === eventId);
+  if(isRegistered){ 
+    alert("Peserta sudah didaftarkan untuk acara ini"); 
+    return; 
   }
 
-  await db.collection("eventParticipants").add({
-    participantId: selectedParticipant,
-    eventId: eventId
-  });
+  const newJoin = { participantId: selectedParticipant, eventId: eventId };
+  const docRef = await db.collection("eventParticipants").add(newJoin);
+  
+  // Suntik ke dalam Cache Lokal secara terus (0 Read Cost!)
+  EVENT_PARTICIPANTS.push({ id: docRef.id, ...newJoin });
 
   alert("Peserta berjaya dimasukkan");
-
   closeModal();
 
-  // refresh cache
-  await initData();
-
-  // reload page semasa (sekolah view)
-  if(typeof currentSchool !== "undefined"){
-    document.getElementById("contentBody").innerHTML = "";
-loadSchoolParticipants(currentSchool);
-  }
+  if(currentSchool){ loadSchoolParticipants(currentSchool); }
 }
 
+// 🔥 OPTIMASI LOCAL MUTATION: Buang hubungan dari memori terus pasca-delete
 async function removeFromEvent(joinId, eventId, eventName){
-
   if(!confirm("Padam peserta dari acara ini?")) return;
-
-  await db.collection("eventParticipants")
-    .doc(joinId)
-    .delete();
+  await db.collection("eventParticipants").doc(joinId).delete();
+  
+  // Buang dari Cache Lokal secara terus (0 Read Cost!)
+  EVENT_PARTICIPANTS = EVENT_PARTICIPANTS.filter(j => j.id !== joinId);
 
   alert("Berjaya dipadam");
-
-  // refresh data cache
-  await initData();
-
-  //  reload semula page event
   loadEventParticipants(eventId, eventName);
 }
 
-
 function exportExcel(){
-
-  if(currentExportData.length === 0){
-  alert("Tiada data untuk export");
-  return;
+  if(currentExportData.length === 0){ alert("Tiada data untuk export"); return; }
+  const worksheet = XLSX.utils.json_to_sheet(currentExportData);
+  worksheet['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 20 }, { wch: 25 }, { wch: 50 }];
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Peserta");
+  XLSX.writeFile(workbook, "peserta.xlsx");
 }
-
-  const worksheet =
-    XLSX.utils.json_to_sheet(currentExportData);
-
- worksheet['!cols'] = [
- { wch: 12 }, // No Badan
- { wch: 30 }, // Nama
- { wch: 20 }, // IC
- { wch: 25 }, // Sekolah
- { wch: 50 }  // Acara
-];
-
-  const workbook =
-    XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    worksheet,
-    "Peserta"
-  );
-
-  XLSX.writeFile(
-    workbook,
-    "peserta.xlsx"
-  );
-}
-
-window.onload = async function(){
-
-  await initData();
-
-  loadStats();
-  loadSchools();
-  loadEventMenu();
-
-};
-
-
 </script>
-
 </body>
 </html>
